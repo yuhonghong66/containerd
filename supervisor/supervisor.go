@@ -333,8 +333,10 @@ func (s *Supervisor) restore() error {
 			continue
 		}
 		processes, err := container.Processes()
-		if err != nil {
-			return err
+		if err != nil || len(processes) == 0 {
+			logrus.WithFields(logrus.Fields{"error": err, "id": id}).Warnf("containerd: container has no process running,removing state directory.")
+			os.RemoveAll(filepath.Join(s.stateDir, id))
+			continue
 		}
 
 		ContainersCounter.Inc(1)
@@ -437,10 +439,14 @@ func (s *Supervisor) getExecSyncChannel(containerID, pid string) chan struct{} {
 	return ch
 }
 
-func (s *Supervisor) getDeleteExecSyncMap(containerID string) map[string]chan struct{} {
+func (s *Supervisor) getExecSyncMap(containerID string) map[string]chan struct{} {
 	s.containerExecSyncLock.Lock()
-	chs := s.containerExecSync[containerID]
+	defer s.containerExecSyncLock.Unlock()
+	return s.containerExecSync[containerID]
+}
+
+func (s *Supervisor) deleteExecSyncMap(containerID string) {
+	s.containerExecSyncLock.Lock()
+	defer s.containerExecSyncLock.Unlock()
 	delete(s.containerExecSync, containerID)
-	s.containerExecSyncLock.Unlock()
-	return chs
 }
