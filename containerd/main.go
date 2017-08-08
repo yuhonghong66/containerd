@@ -162,7 +162,7 @@ func daemon(context *cli.Context) error {
 		return err
 	}
 	s := make(chan os.Signal, 2048)
-	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
+	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT, syscall.SIGPIPE)
 	// Split the listen string of the form proto://addr
 	listenSpec := context.String("listen")
 	listenParts := strings.SplitN(listenSpec, "://", 2)
@@ -196,6 +196,8 @@ func daemon(context *cli.Context) error {
 	}
 	for ss := range s {
 		switch ss {
+		case syscall.SIGPIPE:
+			continue
 		default:
 			logrus.Infof("stopping containerd after receiving %s", ss)
 			server.Stop()
